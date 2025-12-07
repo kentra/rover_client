@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LundBot - Remote Control</title>
+<style>
+    :root {
+        --sz: 76px;
+        --gap: 8px;
+        --bg: #151515;
+        --fg: #fff;
+        --fg2: #9eff00;
+        --hi: #2e7;
+    }
+
+    body {
+        margin: 0;
+        display: grid;
+        place-items: center;
+        height: 100dvh;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px system-ui, Arial
+    }
+
+    .pad {
+        display: grid;
+        grid-template-columns: var(--sz) var(--sz) var(--sz);
+        gap: var(--gap);
+    }
+
+    .info {
+        display: grid;
+        grid-template-columns: var(--sz) var(--sz) var(--sz);
+        gap: var(--gap);
+    }
+
+    button {
+        height: var(--sz);
+        width: var(--sz);
+        border: 1px solid #444;
+        background: #222;
+        color: var(--fg);
+        border-radius: 10px;
+        touch-action: none
+    }
+
+    button:active,
+    .on {
+        background: #1a1a1a;
+        outline: 2px solid var(--hi)
+    }
+
+    .spacer {
+        visibility: hidden
+    }
+
+    .row {
+        display: contents
+    }
+
+    button {
+        color: var(--fg2)
+    }
+</style>
+
+
+<h1>LundBot 🤖 Remote Control</h1>
+
+
+<div class="info">
+    <div class="row">
+        <b>Client IP:</b> <i>%s</i><br>
+    </div>
+    <div class="row">
+        <b>ESP32:</b> <i>%s°C</i><br>
+    </div>
+
+    <div class="row">
+        <b>Distance:</b> <i id="distance"></i>cm </br>
+    </div>
+    <div class="row">
+        <button onclick="toggleMatrix()" aria-label="Matrix">☀</button>
+        <span class="spacer"></span>
+        <button onclick="toggleBuzzer()" aria-label="Buzzer">♬</button>
+    </div>
+</div>
+
+
+<div class="pad" id="pad">
+    <div class="row">
+        <button data-dir="crab_left" aria-label="Crab Left">◀◀</button>
+        <button data-dir="forward" aria-label="Up">▲</button>
+        <button data-dir="crab_right" aria-label="Crab Right">▶▶</button>
+    </div>
+    <div class="row">
+        <button data-dir="left" aria-label="Left">◀</button>
+        <button data-dir="stop" aria-label="Stop">■</button>
+        <button data-dir="right" aria-label="Right">▶</button>
+    </div>
+    <div class="row">
+        <span class="spacer"></span>
+        <button data-dir="back" aria-label="Down">▼</button>
+        <span class="spacer"></span>
+    </div>
+</div>
+
+<script>
+    // --- CONFIG: tweak endpoints or rate here ---
+    const HOST = location.origin;          // e.g. http://192.168.4.1
+    const SEND_EVERY_MS = 50;             // repeat rate while holding
+    const distanceDiv = document.getElementById("distance");
+    const paths = {
+        forward: "/move/forward",
+        back: "/move/back",
+        left: "/move/left",
+        right: "/move/right",
+        crab_left: "/move/crab_left",
+        crab_right: "/move/crab_right",
+        stop: "/move/stop",
+        distance: "/distance",
+        matrix: "/matrix",
+        buzzer: "/buzzer"
+    };
+    // -------------------------------------------
+
+    // const send = (path) => fetch(HOST + path, { method: "GET", keepalive: true }).catch(()=>{});
+    const pad = document.getElementById("pad");
+    let holdTimer = null, activeBtn = null, activeDir = null;
+    let currentController = null;   // <– used to cancel ongoing request(s)
+
+    function start(dir, btn) {
+        console.debug("Creating AbortController")
+        currentController = new AbortController();
+        activeBtn = btn; activeDir = dir;
+        if (dir === "stop") { send(paths.stop); return; }
+        btn && btn.classList.add("on");
+
+        console.debug("Running fetch with dir: " + dir)
+        fetch(HOST + paths[dir], {
+            method: "GET",
+            signal: currentController.signal
+        }).catch(() => { });
+
+
+        holdTimer = setInterval(() => send(paths[dir]), SEND_EVERY_MS); // repeat
+    }
+    function stop() {
+        // Abort any existing pending request
+        if (currentController) {
+            currentController.abort();
+        }
+        if (holdTimer) { clearInterval(holdTimer); holdTimer = null; }
+        if (activeBtn) { activeBtn.classList.remove("on"); activeBtn = null; }
+        // Abort any existing pending request
+        if (currentController) {
+            currentController.abort();
+        }
+        // ✅ Immediately tell the ESP32 to stop (no wait for next interval)
+        fetch(HOST + paths.stop, { method: "GET", keepalive: true }).catch(() => { });
+
+        activeDir = null;
+    }
+
+    async function fetchDistance() {
+        try {
+            const response = await fetch(HOST + paths["distance"], { method: "GET" });
+            if (!response.ok) throw new Error("Network error");
+
+            const text = await response.text();     // e.g. "123.45"
+            const value = parseFloat(text);         // convert to float
+
+            if (!isNaN(value)) {
+                distanceDiv.textContent = value.toFixed(2) + " cm"; // or just value
+            } else {
+                distanceDiv.textContent = "Invalid value";
+            }
+        } catch (err) {
+            distanceDiv.textContent = "Error fetching";
+        }
+    }
+
+    async function toggleMatrix() {
+        const response = await fetch(HOST + paths["matrix"], { method: "GET" });
+    }
+    async function toggleBuzzer() {
+        const response = await fetch(HOST + paths["buzzer"], { method: "GET" });
+    }
+
+    // Fetch distance every 1 second
+    fetchDistance();               // initial fetch
+    setInterval(fetchDistance, 1000);
+
+    // Pointer (mouse/touch) handling
+    pad.addEventListener("pointerdown", (e) => {
+        const btn = e.target.closest("button"); if (!btn) return;
+        e.preventDefault(); btn.setPointerCapture(e.pointerId);
+        start(btn.dataset.dir, btn);
+    }, { passive: false });
+
+    pad.addEventListener("pointerup", stop);
+    pad.addEventListener("pointercancel", stop);
+    pad.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") stop(); });
+
+    // Keyboard arrows / WASD
+    const keyMap = { ArrowUp: "forward", ArrowDown: "back", ArrowLeft: "left", ArrowRight: "right", w: "forward", s: "back", a: "left", d: "right", " ": "stop" };
+    let keyHeld = false;
+    addEventListener("keydown", (e) => {
+        const k = (e.key || "").toLowerCase(); const dir = keyMap[e.key] || keyMap[k];
+        if (!dir || keyHeld) return;
+        e.preventDefault(); keyHeld = true;
+        const btn = [...document.querySelectorAll("button")].find(b => b.dataset.dir === dir);
+        start(dir, btn || null);
+    }, { passive: false });
+
+    addEventListener("keyup", (e) => { if (keyHeld) { keyHeld = false; stop(); } });
+
+    // Safety: stop on page hide
+    document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); });
+
+</script>
+
+</html>

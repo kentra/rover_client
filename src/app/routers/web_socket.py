@@ -1,4 +1,5 @@
-from fastapi import WebSocket, 
+from fastapi import WebSocket, APIRouter
+
 router = APIRouter(
     tags=["websocket"],
 )
@@ -10,4 +11,3 @@ async def websocket_endpoint(websocket: WebSocket):
     while True:
         data = await websocket.receive_text()
         await websocket.send_text(f"Message text was: {data}")
-
