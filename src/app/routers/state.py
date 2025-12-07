@@ -1,6 +1,9 @@
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/states",tags=["states"],)
+router = APIRouter(
+    prefix="/states",
+    tags=["states"],
+)
 
 
 @router.get("/hello-world")
