@@ -4,6 +4,7 @@ from periphery import Serial
 
 
 class MMWave:
+        __slots__ = ['mmwave']
     def __init__(self, port: int, baud_rate: int) -> None:
         """Class for mmWave."""
         self.uart = Serial(
