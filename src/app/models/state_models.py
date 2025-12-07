@@ -9,7 +9,6 @@ class SystemStats(BaseModel):
     cpu_usage: Optional[float] = None
     ram_usage: Optional[float] = None
     disk_usage: Optional[float] = None
-    network_usage: Optional[dict] = None
 
 
 class RoverState(BaseModel):
@@ -45,11 +44,11 @@ GLOBAL_CACHE_INSTANCE = CacheState(
 )
 
 
-def update_user_data_cache(is_fetched: bool):
+def update_user_data_cache(is_fetched: bool, cache_update: CacheState):
     with CACHE_LOCK:
+        GLOBAL_CACHE_INSTANCE = cache_update
         GLOBAL_CACHE_INSTANCE.user_data_fetched = is_fetched
         GLOBAL_CACHE_INSTANCE.last_update_timestamp = time.time()
-        print(f"Cache updated by thread: {GLOBAL_CACHE_INSTANCE.model_dump()}")
 
 
 def get_current_cache_state() -> CacheState:
