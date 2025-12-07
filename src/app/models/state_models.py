@@ -30,7 +30,7 @@ class CacheState(BaseModel):
     user_data_fetched: Optional[bool] = None
     last_update_timestamp: Optional[float] = None  # Using float for a Unix timestamp
     rover_state: Optional[RoverState] = None
-    environment_sensors: Optional[EnvironmentSensors] = None
+    environment_sensors: Optional[EnvironmentSensorsState] = None
     system_stats: Optional[SystemStats] = None
 
 
