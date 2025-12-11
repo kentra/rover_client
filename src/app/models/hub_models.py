@@ -25,15 +25,15 @@ def map_signed(percent: Any) -> tuple[int, int]:
     percent = max(-100, min(100, percent))
     # 3. Scale with cfg.DEADZONE
     # We need to map 1..100% to 25..127 (approx)
-    usable_range = 127 - cfg.DEADZONE
+    usable_range = 127 - cfg.BLE_DEADZONE
     if percent > 0:
         # Positive (Forward)
-        val = cfg.DEADZONE + (percent / 100.0 * usable_range)
+        val = cfg.BLE_DEADZONE + (percent / 100.0 * usable_range)
         return (percent, int(val))
     else:
         # Negative (Backward)
         # We calculate positive magnitude first, then flip to negative
-        mag: float | int = cfg.DEADZONE + (abs(percent) / 100.0 * usable_range)
+        mag: float | int = cfg.BLE_DEADZONE + (abs(percent) / 100.0 * usable_range)
         val: int = -int(mag)
         # Convert negative number to unsigned byte (Two's Complement)
         # e.g. -100 becomes 156 (0x9C)

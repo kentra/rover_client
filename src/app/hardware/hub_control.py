@@ -8,6 +8,7 @@ class HubControl:
     def __init__(self, cfg: AppConfig) -> None:
         self.cfg: AppConfig = cfg
         self.ble_device: BLEDevice | str | None = None
+        self.client: BleakClient | None = None
 
     def __build_packet(
         self,
@@ -18,14 +19,11 @@ class HubControl:
         # Calculate Checksum
         checksum = 0
         # Pydantic model.model_dump() returns a dict of the fields
-        # The values are already mapped to signed bytes by the validator
-        print(motor_speed.model_dump())
         for _, value in motor_speed.model_dump().items():
             if value[-1] is not None:
                 checksum += value[-1]
-        print(f"Checksum pre byte: {checksum}")
+
         checksum &= 0xFF
-        print(f"Checksum pre byte: {checksum}")
 
         # Header AB CD 01 ...
         return bytes(
@@ -42,60 +40,54 @@ class HubControl:
         )
 
     async def connect(self) -> None:
-        if not self.ble_device:
-            self.ble_device = self.cfg.DEVICE_UUID
-        async with BleakClient(address_or_ble_device=self.ble_device) as client:  # type: ignore
+        """Establishes a persistent connection to the BLE device."""
+        if self.client and self.client.is_connected:
+            print("# ℹ️ Already connected.")
+            return
+
+        print(f"# 🔍 Connecting to {self.cfg.BLE_DEVICE_UUID}...")
+        self.client = BleakClient(self.cfg.BLE_DEVICE_UUID)
+        
+        try:
+            await self.client.connect()
             print("# ✅ Connected!")
-            # Stopping first (sending 0x00)...
-            await client.write_gatt_char(
-                self.cfg.WRITE_CHAR_UUID, data=self.__build_packet()
-            )
-            await asyncio.sleep(delay=1)
+            # Stop motors initially
+            await self.drive_tracks(0, 0)
+        except Exception as e:
+            print(f"# ❌ Connection failed: {e}")
+            self.client = None
+            raise e
 
-    async def locate_device(self) -> None:
-        await BleakScanner.find_device_by_address(
-            device_identifier=self.cfg.DEVICE_UUID, timeout=10.0
-        )
-        await asyncio.sleep(delay=0.1)
+    async def disconnect(self) -> None:
+        if self.client and self.client.is_connected:
+            await self.drive_tracks(0, 0) # Safety stop
+            await self.client.disconnect()
+            print("# 🔌 Disconnected.")
+        self.client = None
 
-    async def run_smooth(
-        self,
-        motor_speed: MotorSpeed = MotorSpeed(
-            speed_a=0, speed_b=0, speed_c=0, speed_d=0
-        ),
-        delay: float = 0.1,
-    ) -> None:
-        """Ramps up the motors for smoother trhottle
-
-        Args:
-            motor_speed (MotorSpeed, optional): _description_. Defaults to MotorSpeed( speed_a=0, speed_b=0, speed_c=0, speed_d=0 ).
-            delay (float, optional): _description_. Defaults to 0.1.
+    async def drive_tracks(self, left: int, right: int) -> None:
         """
+        Drive the two tracks.
+        Left -> Motor A
+        Right -> Motor B
+        """
+        if not self.client or not self.client.is_connected:
+            # print("# ⚠️ Not connected. Ignoring command.")
+            return
 
-        # 🚀 Ramping UP Forward (0 -> 100%)...
-        async with BleakClient(address_or_ble_device=self.ble_device) as client:  # type: ignore
-            for s in range(0, 101, 5):
-                print(f"   Speed: {s}%")
-                await client.write_gatt_char(
-                    char_specifier=self.cfg.WRITE_CHAR_UUID,
-                    data=self.__build_packet(
-                        motor_speed=MotorSpeed(
-                            speed_a=s, speed_b=0, speed_c=0, speed_d=0
-                        )
-                    ),
-                )
-                await asyncio.sleep(delay=delay)
-
-    async def run(
-        self,
-        motor_speed: MotorSpeed = MotorSpeed(
-            speed_a=0, speed_b=0, speed_c=0, speed_d=0
-        ),
-        duration: float = 0.1,
-    ) -> None:
-        async with BleakClient(address_or_ble_device=self.ble_device) as client:  # type: ignore
-            await client.write_gatt_char(
-                char_specifier=self.cfg.WRITE_CHAR_UUID,
-                data=self.__build_packet(motor_speed=motor_speed),
+        # Create packet
+        packet = self.__build_packet(
+            MotorSpeed(
+                speed_a=left, 
+                speed_b=right, 
+                speed_c=0, 
+                speed_d=0
             )
-            await asyncio.sleep(delay=duration)
+        )
+
+        try:
+            await self.client.write_gatt_char(
+                self.cfg.BLE_WRITE_CHAR_UUID, packet
+            )
+        except Exception as e:
+            print(f"# ⚠️ Send failed: {e}")
