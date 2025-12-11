@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -28,7 +29,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="src/app/static", html=True), name="static")
+BASE_DIR = Path(__file__).resolve().parent
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static"), html=True), name="static")
 
 env_sensors = EnvironmentSensors(bus_number=cfg.BME280_I2C_BUS)
 
@@ -43,7 +45,8 @@ app.include_router(movement.router)
 
 @app.get("/remote", response_class=HTMLResponse)
 async def remote_control():
-    with open("src/app/models/remote_control.html", "r") as f:
+    path = BASE_DIR / "models" / "remote_control.html"
+    with open(path, "r") as f:
         return f.read()
 
 @app.get("/distance")
