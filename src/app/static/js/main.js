@@ -51,29 +51,16 @@ function sendDriveCommand(left, right) {
     }
 }
 
-// Map Joystick Data to Tank Drive
+// Map Joystick Data to Tank Drive (Touch)
 manager.on('move', (evt, data) => {
     if (!data.vector) return;
-
-    // x and y are typically -1 to 1 (or close to it) from vector
-    // But nipplejs gives angle and distance usually.
-    // Let's use generic logic.
-
-    // data.instance.frontPosition is raw {x, y} relative to enter.
-    // simpler: utilize data.vector (normalized {x, y})
     const x = data.vector.x;
     const y = data.vector.y;
 
-    // Simple Tank Drive Mixing
-    // Speed = Y
-    // Turn = X
-    // Left = Speed + Turn
-    // Right = Speed - Turn
-
+    // Simple Arcade Drive Mixing
     let left = y * 100 + x * 100;
     let right = y * 100 - x * 100;
 
-    // Clamp to -100 to 100
     left = Math.max(-100, Math.min(100, left));
     right = Math.max(-100, Math.min(100, right));
 
