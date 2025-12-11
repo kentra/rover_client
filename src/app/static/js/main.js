@@ -29,53 +29,74 @@ function connect() {
 
 connect();
 
-// Joystick Logic
-const zone = document.getElementById('zone_joystick');
-const manager = nipplejs.create({
-    zone: zone,
+// --- Dual Joystick Setup ---
+const JOYSTICK_SIZE = 150;
+const managerLeft = nipplejs.create({
+    zone: document.getElementById('zone_left'),
     mode: 'static',
     position: { left: '50%', top: '50%' },
-    color: '#06b6d4',
-    size: 150
+    color: 'cyan',
+    size: JOYSTICK_SIZE
 });
 
-// Throttling to prevent flooding BLE
-let lastSent = 0;
-const SEND_INTERVAL = 100; // ms
+const managerRight = nipplejs.create({
+    zone: document.getElementById('zone_right'),
+    mode: 'static',
+    position: { left: '50%', top: '50%' },
+    color: 'cyan',
+    size: JOYSTICK_SIZE
+});
 
-function sendDriveCommand(left, right) {
+// State
+let motorLeft = 0;
+let motorRight = 0;
+// let isTouchActive = false; // Not strictly needed with current logic, gamepad will override if touch is idle.
+
+// Throttling
+let lastSent = 0;
+const SEND_INTERVAL = 50;
+
+function sendLoop() {
     const now = Date.now();
     if (now - lastSent > SEND_INTERVAL && socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ left, right }));
+        socket.send(JSON.stringify({ left: Math.round(motorLeft), right: Math.round(motorRight) }));
         lastSent = now;
     }
+    requestAnimationFrame(sendLoop);
+}
+requestAnimationFrame(sendLoop);
+
+
+// --- Touch Logic (Tank Drive) ---
+function handleTouchMove(evt, data, side) {
+    if (!data.vector) return;
+    // isTouchActive = true; // See comment above
+    const y = data.vector.y;
+    // Map -1..1 to -100..100
+    const val = Math.max(-100, Math.min(100, y * 100));
+
+    if (side === 'left') motorLeft = val;
+    if (side === 'right') motorRight = val;
 }
 
-// Map Joystick Data to Tank Drive (Touch)
-manager.on('move', (evt, data) => {
-    if (!data.vector) return;
-    const x = data.vector.x;
-    const y = data.vector.y;
+function handleTouchEnd(evt, data, side) {
+    if (side === 'left') motorLeft = 0;
+    if (side === 'right') motorRight = 0;
 
-    // Simple Arcade Drive Mixing
-    let left = y * 100 + x * 100;
-    let right = y * 100 - x * 100;
+    // Check if both stopped to clear flag? 
+    // Simplified: Just clear values.
+    // We keep isTouchActive true for a bit? No, just rely on values.
+    // If no active touches, we allow gamepad override.
+}
 
-    left = Math.max(-100, Math.min(100, left));
-    right = Math.max(-100, Math.min(100, right));
+managerLeft.on('move', (evt, data) => handleTouchMove(evt, data, 'left'));
+managerLeft.on('end', (evt, data) => handleTouchEnd(evt, data, 'left'));
 
-    sendDriveCommand(Math.round(left), Math.round(right));
-});
-
-manager.on('end', () => {
-    sendDriveCommand(0, 0);
-    if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ left: 0, right: 0 }));
-    }
-});
+managerRight.on('move', (evt, data) => handleTouchMove(evt, data, 'right'));
+managerRight.on('end', (evt, data) => handleTouchEnd(evt, data, 'right'));
 
 
-// --- Gamepad Support ---
+// --- Gamepad Logic ---
 let gamepadIndex = null;
 const GAMEPAD_DEADZONE = 0.1;
 
@@ -98,8 +119,23 @@ window.addEventListener("gamepaddisconnected", (e) => {
 });
 
 function applyDeadzone(value) {
-    if (Math.abs(value) < GAMEPAD_DEADZONE) return 0;
-    return value;
+    return Math.abs(value) < GAMEPAD_DEADZONE ? 0 : value;
+}
+
+function updateVisuals(manager, x, y) {
+    // x, y are -1 to 1
+    // NippleJS Visuals: We need to move the '.front' element relative to center.
+    // Max distance is size / 2.
+    const maxDist = JOYSTICK_SIZE / 2;
+    const posX = x * maxDist;
+    const posY = y * maxDist; // Joystick Y up is negative (-1). Translate Y negative is UP. Match signs. 
+    // Standard Axes: Y: Up is -1. Down is 1.
+    // NippleVisuals: Translate(x, y). Down should be positive Y.
+    // So if Axis says 1 (Down), we shift visuals by +Y.
+    const frontEl = manager.get(manager.ids[0])?.ui?.front;
+    if (frontEl) {
+        frontEl.style.transform = `translate(${posX}px, ${posY}px)`;
+    }
 }
 
 function gamepadLoop() {
@@ -108,44 +144,37 @@ function gamepadLoop() {
         const gp = gamepads[gamepadIndex];
 
         if (gp) {
-            // Xbox Layout usually:
-            // Axis 0: Left Stick X
-            // Axis 1: Left Stick Y
-            // Axis 2: Right Stick X
-            // Axis 3: Right Stick Y
+            // Xbox: 
+            // Left Stick Y = Axis 1 (Up=-1, Down=1)
+            // Right Stick Y = Axis 3 (Up=-1, Down=1)
+            // Left Stick X = Axis 0
+            // Right Stick X = Axis 2
 
-            // Arcade Drive
-            // Speed: Left Stick Y (Axis 1) - Up is -1 normally, invert it.
-            const speed = -applyDeadzone(gp.axes[1]);
-            // Turn: Right Stick X (Axis 2)
-            const turn = applyDeadzone(gp.axes[2]);
+            // Allow Touch to override Gamepad if active (simple safety)
+            // But we don't track start/end perfectly for 'isTouchActive' globally across two managers easily without counters.
+            // Let's assume Gamepad always writes, unless touch is actively setting values.
+            // Actually, visuals need to be driven by gamepad too.
 
-            // Mixing
-            let left = (speed + turn) * 100;
-            let right = (speed - turn) * 100;
+            // Read Inputs
+            // Tank Drive: Left Stick -> Left, Right Stick -> Right
+            // Invert Axis 1/3 because normally Up=-1 (we want Up=100 forward)
+            const rawLeftY = -applyDeadzone(gp.axes[1]);
+            const rawLeftX = applyDeadzone(gp.axes[0]);
 
-            // Clamp
-            left = Math.max(-100, Math.min(100, left));
-            right = Math.max(-100, Math.min(100, right));
+            const rawRightY = -applyDeadzone(gp.axes[3]);
+            const rawRightX = applyDeadzone(gp.axes[2]);
 
-            // Only send if non-zero or specific interval? 
-            // We reuse sendDriveCommand which handles interval.
-            // But we should prioritize gamepad if it's being used?
-            // For now, let's just send it.
+            // Update Motors
+            motorLeft = rawLeftY * 100;
+            motorRight = rawRightY * 100;
 
-            // Check if active (prevent jitter sending 0s over and over if touch is idle)
-            if (Math.abs(left) > 0 || Math.abs(right) > 0) {
-                sendDriveCommand(Math.round(left), Math.round(right));
-            } else {
-                // Determine if we should send stop? 
-                // Rely on Interval for now, but if user lets go, we want quick stop.
-                // sendDriveCommand will prevent spamming. 
-                // Let's send 0 if we were moving recently? 
-                // Simplified: Just update loop.
-                sendDriveCommand(0, 0);
-            }
+            // Update Visuals
+            // Axis 1 is Y. Up is -1.
+            // Visuals need to match stick.
+            // Left Stick
+            updateVisuals(managerLeft, gp.axes[0], gp.axes[1]);
+            updateVisuals(managerRight, gp.axes[2], gp.axes[3]);
         }
         requestAnimationFrame(gamepadLoop);
     }
 }
-

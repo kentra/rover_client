@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Web Interface**: Added a responsive web controller with virtual joystick (`src/app/static/index.html`).
-- **Gamepad Support**: Added support for Xbox-style gamepads (Arcade drive: Left Stick Speed, Right Stick Turn) in the web interface.
+- **Gamepad Support**: Added support for Xbox-style gamepads with visual feedback.
+    - **Dual Joystick**: UI now features two on-screen joysticks for Tank Drive.
+    - **Visual Sync**: Moving the physical gamepad sticks moves the virtual joysticks in real-time.
 - **Remote Control**: Integrated legacy `remote_control.html` at `/remote` endpoint for button-based control.
 - **WebSocket Control**: implemented real-time track control via WebSocket in `web_socket.py`.
 - **REST Control**: Added REST endpoints (`/move/{direction}`) in `movement.py` to support button-based remotes.
