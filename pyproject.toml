@@ -1,6 +1,6 @@
 [project]
 name = "rover-client"
-version = "0.1.0"
+version = "111225"
 description = "Firmware for my Lege bot"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -8,10 +8,10 @@ dependencies = [
     "asyncio>=4.0.0",
     "fastapi>=0.124.0",
     "fastapi-cli>=0.0.16",
+    "bleak>=0.21.0",
     "pimoroni-bme280>=1.0.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
     "python-periphery>=2.4.1",
     "ruff>=0.14.8",
-    "smbus>=1.1.post2",
 ]
