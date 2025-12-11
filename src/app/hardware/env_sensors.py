@@ -1,12 +1,19 @@
 #!/usr/bin/env python
 
-from bme280 import BME280
-from smbus import SMBus
-
-from app.models.state_models import (
-    EnvironmentSensorsState,
-    get_current_cache_state,
-)
+try:
+    from bme280 import BME280
+    from smbus import SMBus
+    MOCK_SENSORS = False
+except (ImportError, ModuleNotFoundError):
+    print("⚠️ SMBus/BME280 not found. Using Mock Environment Sensors.")
+    MOCK_SENSORS = True
+    class SMBus:
+        def __init__(self, bus): pass
+    class BME280:
+        def __init__(self, i2c_dev): pass
+        def get_temperature(self): return 25.0
+        def get_humidity(self): return 50.0
+        def get_pressure(self): return 1013.25
 
 
 class EnvironmentSensors:
@@ -25,10 +32,3 @@ class EnvironmentSensors:
     async def get_pressure(self) -> float:
         return self.bme280.get_pressure()
 
-    async def get_all(self) -> None:
-        current_cache_state = get_current_cache_state()
-        current_cache_state.environment_sensors = EnvironmentSensorsState(
-            temperature=self.bme280.get_temperature(),
-            humidity=self.bme280.get_humidity(),
-            pressure=self.bme280.get_pressure(),
-        )
