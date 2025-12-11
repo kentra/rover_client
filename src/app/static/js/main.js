@@ -36,7 +36,7 @@ const JOYSTICK_SIZE = isLargeScreen ? 250 : 150;
 const managerLeft = nipplejs.create({
     zone: document.getElementById('zone_left'),
     mode: 'static',
-    position: { left: '50%', top: '50%' },
+    position: { left: '20%', top: '50%' },
     color: 'cyan',
     size: JOYSTICK_SIZE
 });
@@ -44,7 +44,7 @@ const managerLeft = nipplejs.create({
 const managerRight = nipplejs.create({
     zone: document.getElementById('zone_right'),
     mode: 'static',
-    position: { left: '50%', top: '50%' },
+    position: { left: '80%', top: '50%' },
     color: 'cyan',
     size: JOYSTICK_SIZE
 });
