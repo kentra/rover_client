@@ -81,10 +81,84 @@ manager.on('move', (evt, data) => {
 });
 
 manager.on('end', () => {
-    // Stop on release
     sendDriveCommand(0, 0);
-    // Force send stop immediately
     if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ left: 0, right: 0 }));
     }
 });
+
+
+// --- Gamepad Support ---
+let gamepadIndex = null;
+const GAMEPAD_DEADZONE = 0.1;
+
+window.addEventListener("gamepadconnected", (e) => {
+    console.log("Gamepad connected at index %d: %s. %d buttons, %d axes.",
+        e.gamepad.index, e.gamepad.id,
+        e.gamepad.buttons.length, e.gamepad.axes.length);
+    gamepadIndex = e.gamepad.index;
+    statusEl.textContent = "Gamepad Connected";
+    requestAnimationFrame(gamepadLoop);
+});
+
+window.addEventListener("gamepaddisconnected", (e) => {
+    console.log("Gamepad disconnected from index %d: %s",
+        e.gamepad.index, e.gamepad.id);
+    if (gamepadIndex === e.gamepad.index) {
+        gamepadIndex = null;
+        statusEl.textContent = "Gamepad Disconnected";
+    }
+});
+
+function applyDeadzone(value) {
+    if (Math.abs(value) < GAMEPAD_DEADZONE) return 0;
+    return value;
+}
+
+function gamepadLoop() {
+    if (gamepadIndex !== null) {
+        const gamepads = navigator.getGamepads();
+        const gp = gamepads[gamepadIndex];
+
+        if (gp) {
+            // Xbox Layout usually:
+            // Axis 0: Left Stick X
+            // Axis 1: Left Stick Y
+            // Axis 2: Right Stick X
+            // Axis 3: Right Stick Y
+
+            // Arcade Drive
+            // Speed: Left Stick Y (Axis 1) - Up is -1 normally, invert it.
+            const speed = -applyDeadzone(gp.axes[1]);
+            // Turn: Right Stick X (Axis 2)
+            const turn = applyDeadzone(gp.axes[2]);
+
+            // Mixing
+            let left = (speed + turn) * 100;
+            let right = (speed - turn) * 100;
+
+            // Clamp
+            left = Math.max(-100, Math.min(100, left));
+            right = Math.max(-100, Math.min(100, right));
+
+            // Only send if non-zero or specific interval? 
+            // We reuse sendDriveCommand which handles interval.
+            // But we should prioritize gamepad if it's being used?
+            // For now, let's just send it.
+
+            // Check if active (prevent jitter sending 0s over and over if touch is idle)
+            if (Math.abs(left) > 0 || Math.abs(right) > 0) {
+                sendDriveCommand(Math.round(left), Math.round(right));
+            } else {
+                // Determine if we should send stop? 
+                // Rely on Interval for now, but if user lets go, we want quick stop.
+                // sendDriveCommand will prevent spamming. 
+                // Let's send 0 if we were moving recently? 
+                // Simplified: Just update loop.
+                sendDriveCommand(0, 0);
+            }
+        }
+        requestAnimationFrame(gamepadLoop);
+    }
+}
+
