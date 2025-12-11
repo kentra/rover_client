@@ -244,5 +244,58 @@ footer {
     width: 40px;
     height: 15px;
     border-radius: 10px;
+
     font-size: 8px;
+}
+
+@media (min-width: 1024px) and (orientation: landscape) {
+    header {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: auto;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 10px 30px;
+        border-radius: 30px;
+        backdrop-filter: blur(10px);
+    }
+
+    footer {
+        display: none;
+    }
+
+    #gamepad_hud {
+        width: 400px;
+        height: 220px;
+        bottom: 40px;
+        transform: translateX(-50%) scale(1.2);
+    }
+
+    .btn {
+        width: 40px;
+        height: 40px;
+        font-size: 12px;
+    }
+
+    .dpad-grid,
+    .face-grid {
+        gap: 6px;
+    }
+
+    .dpad-grid {
+        grid-template-columns: 25px 25px 25px;
+        grid-template-rows: 25px 25px 25px;
+    }
+
+    .face-grid {
+        grid-template-columns: 32px 32px 32px;
+        grid-template-rows: 32px 32px 32px;
+    }
+
+    .bumper,
+    .trigger {
+        width: 80px;
+        height: 25px;
+    }
 }

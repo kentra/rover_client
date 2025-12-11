@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Gamepad Support**: Added support for Xbox-style gamepads with visual feedback.
     - **Dual Joystick**: UI now features two on-screen joysticks for Tank Drive.
     - **Visual Sync**: Moving the physical gamepad sticks moves the virtual joysticks in real-time.
+    - **HUD Overlay**: Added a centered HUD showing status of all buttons, triggers, and D-Pad.
+- **Optimized UI**: Enhanced layout for 1080p Landscape screens (Android/Handhelds), including larger controls and scaled HUD.
 - **Remote Control**: Integrated legacy `remote_control.html` at `/remote` endpoint for button-based control.
 - **WebSocket Control**: implemented real-time track control via WebSocket in `web_socket.py`.
 - **REST Control**: Added REST endpoints (`/move/{direction}`) in `movement.py` to support button-based remotes.

@@ -30,7 +30,9 @@ function connect() {
 connect();
 
 // --- Dual Joystick Setup ---
-const JOYSTICK_SIZE = 150;
+const isLargeScreen = window.innerWidth > 1024;
+const JOYSTICK_SIZE = isLargeScreen ? 250 : 150;
+
 const managerLeft = nipplejs.create({
     zone: document.getElementById('zone_left'),
     mode: 'static',
