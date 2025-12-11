@@ -174,7 +174,46 @@ function gamepadLoop() {
             // Left Stick
             updateVisuals(managerLeft, gp.axes[0], gp.axes[1]);
             updateVisuals(managerRight, gp.axes[2], gp.axes[3]);
+
+            // Update HUD
+            updateHud(gp);
         }
         requestAnimationFrame(gamepadLoop);
     }
+}
+
+function updateBtn(id, btnObj) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (btnObj && btnObj.pressed) el.classList.add('active');
+    else el.classList.remove('active');
+
+    // Analog Triggers visual
+    if ((id === 'btn_lt' || id === 'btn_rt') && btnObj) {
+        el.style.backgroundColor = `rgba(59, 130, 246, ${btnObj.value})`;
+    }
+}
+
+function updateHud(gp) {
+    const b = gp.buttons;
+    if (!b) return;
+
+    updateBtn('btn_a', b[0]);
+    updateBtn('btn_b', b[1]);
+    updateBtn('btn_x', b[2]);
+    updateBtn('btn_y', b[3]);
+
+    updateBtn('btn_lb', b[4]);
+    updateBtn('btn_rb', b[5]);
+
+    updateBtn('btn_lt', b[6]);
+    updateBtn('btn_rt', b[7]);
+
+    updateBtn('btn_select', b[8]);
+    updateBtn('btn_start', b[9]);
+
+    updateBtn('btn_up', b[12]);
+    updateBtn('btn_down', b[13]);
+    updateBtn('btn_left', b[14]);
+    updateBtn('btn_right', b[15]);
 }
